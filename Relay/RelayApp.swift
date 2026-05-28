@@ -1,10 +1,3 @@
-//
-//  RelayApp.swift
-//  Relay
-//
-//  Created by Asesh Shrestha on 28/05/2026.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,10 +5,11 @@ import SwiftData
 struct RelayApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            CollectionItem.self,
+            RequestItem.self,
+            HeaderItem.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
