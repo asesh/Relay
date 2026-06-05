@@ -8,6 +8,9 @@ struct RelayApp: App {
             CollectionItem.self,
             RequestItem.self,
             HeaderItem.self,
+            QueryParamItem.self,
+            RelayEnvironment.self,
+            EnvironmentVariable.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

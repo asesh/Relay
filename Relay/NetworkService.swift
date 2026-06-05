@@ -50,17 +50,69 @@ class NetworkService {
         session = URLSession(configuration: config)
     }
 
-    func send(_ request: RequestItem) async throws -> HTTPResponse {
-        let trimmed = request.url.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, let url = URL(string: trimmed) else {
+    func send(_ request: RequestItem, environment: RelayEnvironment?) async throws -> HTTPResponse {
+        let rawURL = substitute(request.url.trimmingCharacters(in: .whitespaces), with: environment)
+        guard !rawURL.isEmpty, var components = URLComponents(string: rawURL) else {
+            throw URLError(.badURL)
+        }
+
+        let authType = AuthType(rawValue: request.authType) ?? .none
+        let existingParams = components.queryItems ?? []
+        var additionalParams: [URLQueryItem] = []
+
+        for param in request.queryParams where param.isEnabled && !param.key.isEmpty {
+            additionalParams.append(URLQueryItem(
+                name: substitute(param.key, with: environment),
+                value: substitute(param.value, with: environment)
+            ))
+        }
+
+        if authType == .apiKey && request.authApiKeyLocation == APIKeyLocation.queryParam.rawValue {
+            let keyName = request.authApiKeyName.isEmpty ? "apikey" : request.authApiKeyName
+            let keyValue = substitute(request.authApiKeyValue, with: environment)
+            if !keyValue.isEmpty {
+                additionalParams.append(URLQueryItem(name: keyName, value: keyValue))
+            }
+        }
+
+        if !additionalParams.isEmpty {
+            components.queryItems = existingParams + additionalParams
+        }
+
+        guard let url = components.url else {
             throw URLError(.badURL)
         }
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method
 
+        switch authType {
+        case .bearer:
+            let token = substitute(request.authBearerToken, with: environment)
+            if !token.isEmpty {
+                urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+        case .basic:
+            let user = substitute(request.authBasicUsername, with: environment)
+            let pass = substitute(request.authBasicPassword, with: environment)
+            if !user.isEmpty {
+                let encoded = Data("\(user):\(pass)".utf8).base64EncodedString()
+                urlRequest.setValue("Basic \(encoded)", forHTTPHeaderField: "Authorization")
+            }
+        case .apiKey:
+            if request.authApiKeyLocation == APIKeyLocation.header.rawValue {
+                let keyName = request.authApiKeyName.isEmpty ? "X-API-Key" : request.authApiKeyName
+                let keyValue = substitute(request.authApiKeyValue, with: environment)
+                if !keyValue.isEmpty {
+                    urlRequest.setValue(keyValue, forHTTPHeaderField: keyName)
+                }
+            }
+        case .none:
+            break
+        }
+
         for header in request.headers where header.isEnabled && !header.key.isEmpty {
-            urlRequest.setValue(header.value, forHTTPHeaderField: header.key)
+            urlRequest.setValue(substitute(header.value, with: environment), forHTTPHeaderField: header.key)
         }
 
         let bodyType = BodyType(rawValue: request.bodyType) ?? .none
@@ -85,5 +137,14 @@ class NetworkService {
         }
 
         return HTTPResponse(statusCode: httpResponse.statusCode, responseHeaders: headers, body: data, duration: duration)
+    }
+
+    private func substitute(_ text: String, with environment: RelayEnvironment?) -> String {
+        guard let env = environment else { return text }
+        var result = text
+        for variable in env.variables where variable.isEnabled && !variable.key.isEmpty {
+            result = result.replacingOccurrences(of: "{{\(variable.key)}}", with: variable.value)
+        }
+        return result
     }
 }
