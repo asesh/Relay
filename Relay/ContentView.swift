@@ -6,6 +6,7 @@ struct ContentView: View {
   @State private var openTabs: [RequestItem] = []
   @State private var selectedTab: RequestItem?
   @State private var showingEnvironments = false
+  @State private var showCurlSidebar = false
   @AppStorage("activeEnvironmentName") private var activeEnvironmentName: String = ""
   @Query(sort: \RelayEnvironment.createdAt) private var environments: [RelayEnvironment]
 
@@ -23,16 +24,23 @@ struct ContentView: View {
       )
       .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
     } detail: {
-      VStack(spacing: 0) {
-        if !openTabs.isEmpty {
-          tabBar
-          Divider().background(Color.relayBorder)
+      HStack(spacing: 0) {
+        VStack(spacing: 0) {
+          if !openTabs.isEmpty {
+            tabBar
+            Divider().background(Color.relayBorder)
+          }
+          if let tab = selectedTab {
+            RequestEditorView(request: tab, activeEnvironment: activeEnvironment)
+              .id(tab.id)
+          } else {
+            WelcomeView()
+          }
         }
-        if let tab = selectedTab {
-          RequestEditorView(request: tab, activeEnvironment: activeEnvironment)
-            .id(tab.id)
-        } else {
-          WelcomeView()
+        if showCurlSidebar, let tab = selectedTab {
+          Divider().background(Color.relayBorder)
+          CurlSidebarView(request: tab, environment: activeEnvironment)
+            .frame(width: 300)
         }
       }
     }
@@ -40,6 +48,16 @@ struct ContentView: View {
     .toolbar {
       ToolbarItem(placement: .navigation) {
         environmentPicker
+      }
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          withAnimation(.easeInOut(duration: 0.2)) { showCurlSidebar.toggle() }
+        } label: {
+          Image(systemName: "terminal")
+            .foregroundStyle(showCurlSidebar ? Color.relayAccent : Color.relaySecondary)
+        }
+        .help(showCurlSidebar ? "Hide cURL" : "Show cURL")
+        .disabled(selectedTab == nil)
       }
       ToolbarItem(placement: .primaryAction) {
         Button {
