@@ -49,6 +49,11 @@ All relationships use cascade delete. `RequestItem` stores `method` and `bodyTyp
 
 `Relay/Relay.entitlements` enables App Sandbox with outbound network client access. Any new capability (e.g., file access, iCloud) must be added here and in the Xcode target's Signing & Capabilities tab.
 
+## Coding Guidelines
+
+- **Indentation:** 2 spaces (no tabs).
+- **Line length:** 120 characters maximum.
+
 ## Key Conventions
 
 - `@Model` classes use `String` for enum-valued fields; convert to/from `HTTPMethod`/`BodyType` at the call site.

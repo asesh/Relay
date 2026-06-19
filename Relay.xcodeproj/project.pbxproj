@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CF8A16612FE5016500354486 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = CF8A16602FE5016500354486 /* README.md */; };
 		CFDA0B412FD33468000649DF /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = CFDA0B402FD33468000649DF /* CLAUDE.md */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		CF8A16602FE5016500354486 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		CFAF6B312FC8475100855973 /* Relay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Relay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CFAF6B402FC8475300855973 /* RelayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CFAF6B4A2FC8475300855973 /* RelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -80,6 +82,7 @@
 		CFAF6B282FC8475100855973 = {
 			isa = PBXGroup;
 			children = (
+				CF8A16602FE5016500354486 /* README.md */,
 				CFDA0B402FD33468000649DF /* CLAUDE.md */,
 				CFAF6B332FC8475100855973 /* Relay */,
 				CFAF6B432FC8475300855973 /* RelayTests */,
@@ -218,6 +221,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CF8A16612FE5016500354486 /* README.md in Resources */,
 				CFDA0B412FD33468000649DF /* CLAUDE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
