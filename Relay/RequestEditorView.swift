@@ -14,15 +14,19 @@ enum ResponseTab: String, CaseIterable {
   case headers = "Headers"
 }
 
+struct TabState {
+  var requestTab: RequestTab = .params
+  var responseTab: ResponseTab = .pretty
+  var response: HTTPResponse?
+  var isLoading = false
+  var errorMessage: String?
+}
+
 struct RequestEditorView: View {
   @Bindable var request: RequestItem
   var activeEnvironment: RelayEnvironment?
+  @Binding var tabState: TabState
   @Environment(\.modelContext) private var modelContext
-  @State private var requestTab: RequestTab = .params
-  @State private var responseTab: ResponseTab = .pretty
-  @State private var response: HTTPResponse?
-  @State private var isLoading = false
-  @State private var errorMessage: String?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -88,7 +92,7 @@ struct RequestEditorView: View {
       Task { await sendRequest() }
     } label: {
       HStack(spacing: 6) {
-        if isLoading {
+        if tabState.isLoading {
           ProgressView()
             .scaleEffect(0.7)
             .tint(.white)
@@ -100,11 +104,11 @@ struct RequestEditorView: View {
       }
       .padding(.horizontal, 18)
       .padding(.vertical, 8)
-      .background(isLoading ? Color.relayAccent.opacity(0.6) : Color.relayAccent)
+      .background(tabState.isLoading ? Color.relayAccent.opacity(0.6) : Color.relayAccent)
       .clipShape(RoundedRectangle(cornerRadius: 6))
     }
     .buttonStyle(.plain)
-    .disabled(isLoading || request.url.trimmingCharacters(in: .whitespaces).isEmpty)
+    .disabled(tabState.isLoading || request.url.trimmingCharacters(in: .whitespaces).isEmpty)
   }
 
   // MARK: - Request Tabs
@@ -129,8 +133,8 @@ struct RequestEditorView: View {
   private var requestTabs: some View {
     HStack(spacing: 0) {
       ForEach(RequestTab.allCases, id: \.rawValue) { tab in
-        tabButton(tabLabel(tab), isSelected: requestTab == tab) {
-          requestTab = tab
+        tabButton(tabLabel(tab), isSelected: tabState.requestTab == tab) {
+          tabState.requestTab = tab
         }
       }
       Spacer()
@@ -162,7 +166,7 @@ struct RequestEditorView: View {
 
   @ViewBuilder
   private var requestTabContent: some View {
-    switch requestTab {
+    switch tabState.requestTab {
     case .params:
       ParamsEditorView(request: request)
     case .auth:
@@ -180,9 +184,9 @@ struct RequestEditorView: View {
     VStack(spacing: 0) {
       responseHeader
       Divider().background(Color.relayBorder)
-      if let error = errorMessage {
+      if let error = tabState.errorMessage {
         errorView(error)
-      } else if let response {
+      } else if let response = tabState.response {
         VStack(spacing: 0) {
           responseTabs(response)
           Divider().background(Color.relayBorder)
@@ -202,7 +206,7 @@ struct RequestEditorView: View {
         .foregroundStyle(Color.relaySecondary)
         .textCase(.uppercase)
       Spacer()
-      if let response {
+      if let response = tabState.response {
         HStack(spacing: 12) {
           statusBadge(response)
           Text(response.durationString)
@@ -233,8 +237,8 @@ struct RequestEditorView: View {
   private func responseTabs(_ response: HTTPResponse) -> some View {
     HStack(spacing: 0) {
       ForEach(ResponseTab.allCases, id: \.rawValue) { tab in
-        tabButton(tab.rawValue, isSelected: responseTab == tab) {
-          responseTab = tab
+        tabButton(tab.rawValue, isSelected: tabState.responseTab == tab) {
+          tabState.responseTab = tab
         }
       }
       Spacer()
@@ -245,7 +249,7 @@ struct RequestEditorView: View {
 
   @ViewBuilder
   private func responseBody(_ response: HTTPResponse) -> some View {
-    switch responseTab {
+    switch tabState.responseTab {
     case .pretty:
       ScrollView {
         Text(response.prettyBody)
@@ -324,15 +328,15 @@ struct RequestEditorView: View {
   // MARK: - Networking
 
   private func sendRequest() async {
-    isLoading = true
-    errorMessage = nil
-    response = nil
+    tabState.isLoading = true
+    tabState.errorMessage = nil
+    tabState.response = nil
     do {
-      response = try await NetworkService.shared.send(request, environment: activeEnvironment)
+      tabState.response = try await NetworkService.shared.send(request, environment: activeEnvironment)
     } catch {
-      errorMessage = error.localizedDescription
+      tabState.errorMessage = error.localizedDescription
     }
-    isLoading = false
+    tabState.isLoading = false
   }
 }
 

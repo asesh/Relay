@@ -10,10 +10,7 @@ struct SidebarView: View {
   @State private var showingNewCollection = false
   @State private var newCollectionName = ""
   @AppStorage("expandedCollectionNames") private var expandedNamesStore: String = ""
-
-  private var expandedNames: Set<String> {
-    Set(expandedNamesStore.isEmpty ? [] : expandedNamesStore.components(separatedBy: "\n"))
-  }
+  @State private var expandedNames: Set<String> = []
 
   var body: some View {
     VStack(spacing: 0) {
@@ -42,6 +39,9 @@ struct SidebarView: View {
       }
     }
     .background(Color.relaySidebar)
+    .onChange(of: expandedNamesStore, initial: true) { _, newValue in
+      expandedNames = Set(newValue.isEmpty ? [] : newValue.components(separatedBy: "\n"))
+    }
     .alert("New Collection", isPresented: $showingNewCollection) {
       TextField("Collection name", text: $newCollectionName)
       Button("Create") { createCollection() }
@@ -197,6 +197,7 @@ struct RequestRow: View {
   @State private var isRenaming = false
   @State private var editingName = ""
   @FocusState private var isRenameFocused: Bool
+  @State private var lastTapTime: Date = .distantPast
 
   var body: some View {
     HStack(spacing: 8) {
@@ -226,8 +227,15 @@ struct RequestRow: View {
     .padding(.vertical, 6)
     .background(isSelected ? Color.relayAccent.opacity(0.2) : Color.clear)
     .contentShape(Rectangle())
-    .onTapGesture(count: 2) { startRename() }
-    .onTapGesture(count: 1) { onSelect() }
+    .onTapGesture {
+      let now = Date()
+      if now.timeIntervalSince(lastTapTime) < 0.35 {
+        startRename()
+      } else {
+        onSelect()
+      }
+      lastTapTime = now
+    }
     .contextMenu {
       Button("Rename") { startRename() }
       Divider()

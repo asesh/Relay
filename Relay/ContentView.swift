@@ -5,6 +5,7 @@ struct ContentView: View {
   @Environment(\.modelContext) private var modelContext
   @State private var openTabs: [RequestItem] = []
   @State private var selectedTab: RequestItem?
+  @State private var tabStates: [PersistentIdentifier: TabState] = [:]
   @State private var showingEnvironments = false
   @State private var showCurlSidebar = false
   @AppStorage("activeEnvironmentName") private var activeEnvironmentName: String = ""
@@ -31,8 +32,14 @@ struct ContentView: View {
             Divider().background(Color.relayBorder)
           }
           if let tab = selectedTab {
-            RequestEditorView(request: tab, activeEnvironment: activeEnvironment)
-              .id(tab.id)
+            RequestEditorView(
+              request: tab,
+              activeEnvironment: activeEnvironment,
+              tabState: Binding(
+                get: { tabStates[tab.id, default: TabState()] },
+                set: { tabStates[tab.id] = $0 }
+              )
+            )
           } else {
             WelcomeView()
           }
@@ -104,6 +111,7 @@ struct ContentView: View {
   private func openRequest(_ request: RequestItem) {
     if !openTabs.contains(where: { $0.id == request.id }) {
       openTabs.append(request)
+      tabStates[request.id] = TabState()
     }
     selectedTab = request
     saveSession()
@@ -112,6 +120,7 @@ struct ContentView: View {
   private func closeTab(_ request: RequestItem) {
     guard let idx = openTabs.firstIndex(where: { $0.id == request.id }) else { return }
     openTabs.remove(at: idx)
+    tabStates.removeValue(forKey: request.id)
     if selectedTab?.id == request.id {
       selectedTab = openTabs.isEmpty ? nil : openTabs[max(0, idx - 1)]
     }
@@ -141,6 +150,7 @@ struct ContentView: View {
 
     let byID = Dictionary(uniqueKeysWithValues: allItems.map { ($0.persistentModelID, $0) })
     openTabs = ids.compactMap { byID[$0] }
+    for tab in openTabs { tabStates[tab.id] = TabState() }
 
     let selectedID = UserDefaults.standard.data(forKey: "sessionSelectedTabID")
       .flatMap { try? JSONDecoder().decode(PersistentIdentifier.self, from: $0) }
