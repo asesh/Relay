@@ -5,107 +5,190 @@ struct EnvironmentsView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Query(sort: \RelayEnvironment.createdAt) private var environments: [RelayEnvironment]
+  @State private var selectedEnvironment: RelayEnvironment?
   @State private var showingNewEnvironment = false
   @State private var newEnvironmentName = ""
 
   var body: some View {
-    NavigationStack {
-      Group {
-        if environments.isEmpty {
-          emptyState
-        } else {
-          List {
-            ForEach(environments) { env in
-              NavigationLink(value: env) {
-                HStack {
-                  Image(systemName: "globe")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.relayAccent)
-                  Text(env.name)
-                    .foregroundStyle(.white)
-                  Spacer()
-                  let enabledCount = env.variables.filter { $0.isEnabled }.count
-                  if enabledCount > 0 {
-                    Text("\(enabledCount) var\(enabledCount == 1 ? "" : "s")")
-                      .font(.system(size: 11))
-                      .foregroundStyle(Color.relaySecondary)
-                  }
-                }
-              }
-            }
-            .onDelete { offsets in
-              for index in offsets {
-                modelContext.delete(environments[index])
-              }
-            }
-          }
-          .scrollContentBackground(.hidden)
-          .background(Color.relaySidebar)
-        }
-      }
-      .navigationTitle("Environments")
-      .navigationDestination(for: RelayEnvironment.self) { env in
-        EnvironmentDetailView(environment: env)
-      }
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Done") { dismiss() }
-            .foregroundStyle(Color.relayAccent)
-        }
-        ToolbarItem(placement: .primaryAction) {
-          Button {
-            showingNewEnvironment = true
-          } label: {
-            Image(systemName: "plus")
-          }
-        }
-      }
-      .alert("New Environment", isPresented: $showingNewEnvironment) {
-        TextField("Environment name", text: $newEnvironmentName)
-        Button("Create") { createEnvironment() }
-        Button("Cancel", role: .cancel) { newEnvironmentName = "" }
+    VStack(spacing: 0) {
+      windowTitleBar
+      Divider().background(Color.relayBorder)
+      HStack(spacing: 0) {
+        environmentList
+        Divider().background(Color.relayBorder)
+        detailPane
       }
     }
+    .frame(minWidth: 640, minHeight: 420)
     .preferredColorScheme(.dark)
+    .alert("New Environment", isPresented: $showingNewEnvironment) {
+      TextField("Environment name", text: $newEnvironmentName)
+      Button("Create") { createEnvironment() }
+      Button("Cancel", role: .cancel) { newEnvironmentName = "" }
+    }
+  }
+
+  // MARK: - Title Bar
+
+  private var windowTitleBar: some View {
+    HStack {
+      Text("Environments")
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.white)
+      Spacer()
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .font(.system(size: 16))
+          .foregroundStyle(Color.relaySecondary)
+      }
+      .buttonStyle(.plain)
+      .keyboardShortcut(.escape, modifiers: [])
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(Color.relayPanel)
+  }
+
+  // MARK: - Left column
+
+  private var environmentList: some View {
+    VStack(spacing: 0) {
+      listHeader
+      Divider().background(Color.relayBorder)
+      ScrollView {
+        LazyVStack(spacing: 0) {
+          if environments.isEmpty {
+            emptyList
+          } else {
+            ForEach(environments) { env in
+              EnvRowView(
+                env: env,
+                isSelected: selectedEnvironment?.id == env.id,
+                onSelect: { selectedEnvironment = env },
+                onDelete: {
+                  if selectedEnvironment?.id == env.id { selectedEnvironment = nil }
+                  modelContext.delete(env)
+                }
+              )
+            }
+          }
+        }
+        .padding(.vertical, 4)
+      }
+    }
+    .frame(width: 210)
     .background(Color.relaySidebar)
   }
 
-  private var emptyState: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "globe.badge.chevron.backward")
-        .font(.system(size: 40))
+  private var listHeader: some View {
+    HStack {
+      Text("All Environments")
+        .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(Color.relaySecondary)
-      Text("No environments yet")
-        .font(.system(size: 14, weight: .medium))
-        .foregroundStyle(.white)
-      Text("Create an environment to store variables like base URLs and API keys. Reference them in your requests with {{variableName}}.")
-        .font(.system(size: 13))
-        .foregroundStyle(Color.relaySecondary)
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 32)
+        .textCase(.uppercase)
+      Spacer()
       Button {
         showingNewEnvironment = true
       } label: {
-        Text("New Environment")
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(.white)
-          .padding(.horizontal, 18)
-          .padding(.vertical, 9)
-          .background(Color.relayAccent)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+        Image(systemName: "plus")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(Color.relaySecondary)
       }
       .buttonStyle(.plain)
-      .padding(.top, 4)
+      .help("New Environment")
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.relaySidebar)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
   }
+
+  private var emptyList: some View {
+    VStack(spacing: 8) {
+      Image(systemName: "globe.badge.chevron.backward")
+        .font(.system(size: 28))
+        .foregroundStyle(Color.relaySecondary)
+      Text("No environments")
+        .font(.system(size: 12))
+        .foregroundStyle(Color.relaySecondary)
+      Button("New Environment") {
+        showingNewEnvironment = true
+      }
+      .font(.system(size: 12))
+      .foregroundStyle(Color.relayAccent)
+      .buttonStyle(.plain)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.top, 40)
+  }
+
+  // MARK: - Right column
+
+  @ViewBuilder
+  private var detailPane: some View {
+    if let env = selectedEnvironment {
+      EnvironmentDetailView(environment: env)
+    } else {
+      VStack(spacing: 12) {
+        Image(systemName: "curlybraces")
+          .font(.system(size: 36))
+          .foregroundStyle(Color.relaySecondary)
+        Text("Select an environment to edit its variables")
+          .font(.system(size: 13))
+          .foregroundStyle(Color.relaySecondary)
+          .multilineTextAlignment(.center)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(Color.relayBg)
+    }
+  }
+
+  // MARK: - Actions
 
   private func createEnvironment() {
     let name = newEnvironmentName.trimmingCharacters(in: .whitespaces)
     let env = RelayEnvironment(name: name.isEmpty ? "New Environment" : name)
     modelContext.insert(env)
     newEnvironmentName = ""
+    selectedEnvironment = env
+  }
+}
+
+// MARK: - Environment Row
+
+private struct EnvRowView: View {
+  let env: RelayEnvironment
+  let isSelected: Bool
+  let onSelect: () -> Void
+  let onDelete: () -> Void
+
+  var body: some View {
+    Button(action: onSelect) {
+      HStack(spacing: 8) {
+        Image(systemName: "globe")
+          .font(.system(size: 11))
+          .foregroundStyle(isSelected ? Color.relayAccent : Color.relaySecondary)
+        Text(env.name)
+          .font(.system(size: 13))
+          .foregroundStyle(isSelected ? .white : Color(red: 0.85, green: 0.85, blue: 0.85))
+          .lineLimit(1)
+        Spacer()
+        let count = env.variables.filter { $0.isEnabled }.count
+        if count > 0 {
+          Text("\(count)")
+            .font(.system(size: 10))
+            .foregroundStyle(Color.relaySecondary)
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(isSelected ? Color.relayAccent.opacity(0.2) : Color.clear)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .contextMenu {
+      Button("Delete Environment", role: .destructive, action: onDelete)
+    }
   }
 }
 
@@ -115,6 +198,7 @@ struct EnvironmentDetailView: View {
   @Bindable var environment: RelayEnvironment
   @Environment(\.modelContext) private var modelContext
   @State private var showingRename = false
+  @State private var showingDeleteConfirm = false
   @State private var newName = ""
 
   var sortedVariables: [EnvironmentVariable] {
@@ -123,6 +207,8 @@ struct EnvironmentDetailView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      detailHeader
+      Divider().background(Color.relayBorder)
       columnHeader
       Divider().background(Color.relayBorder)
       if environment.variables.isEmpty {
@@ -141,16 +227,6 @@ struct EnvironmentDetailView: View {
       addVariableButton
     }
     .background(Color.relayBg)
-    .navigationTitle(environment.name)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button("Rename") {
-          newName = environment.name
-          showingRename = true
-        }
-        .foregroundStyle(Color.relaySecondary)
-      }
-    }
     .alert("Rename Environment", isPresented: $showingRename) {
       TextField("Name", text: $newName)
       Button("Rename") {
@@ -159,6 +235,47 @@ struct EnvironmentDetailView: View {
       }
       Button("Cancel", role: .cancel) {}
     }
+    .confirmationDialog(
+      "Delete \"\(environment.name)\"?",
+      isPresented: $showingDeleteConfirm,
+      titleVisibility: .visible
+    ) {
+      Button("Delete Environment", role: .destructive) {
+        modelContext.delete(environment)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("All variables in this environment will be permanently deleted.")
+    }
+  }
+
+  private var detailHeader: some View {
+    HStack {
+      Text(environment.name)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.white)
+      Spacer()
+      Button("Rename") {
+        newName = environment.name
+        showingRename = true
+      }
+      .font(.system(size: 12))
+      .foregroundStyle(Color.relaySecondary)
+      .buttonStyle(.plain)
+      Button {
+        showingDeleteConfirm = true
+      } label: {
+        Image(systemName: "trash")
+          .font(.system(size: 12))
+          .foregroundStyle(Color(red: 0.976, green: 0.243, blue: 0.243))
+      }
+      .buttonStyle(.plain)
+      .help("Delete Environment")
+      .padding(.leading, 8)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(Color.relayPanel)
   }
 
   private var columnHeader: some View {
@@ -194,9 +311,7 @@ struct EnvironmentDetailView: View {
   }
 
   private var addVariableButton: some View {
-    Button {
-      addVariable()
-    } label: {
+    Button { addVariable() } label: {
       HStack(spacing: 6) {
         Image(systemName: "plus.circle")
         Text("Add Variable")
