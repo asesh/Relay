@@ -51,7 +51,10 @@ class NetworkService {
   }
 
   func send(_ request: RequestItem, environment: RelayEnvironment?) async throws -> HTTPResponse {
-    let rawURL = substitute(request.url.trimmingCharacters(in: .whitespaces), with: environment)
+    var rawURL = substitute(request.url.trimmingCharacters(in: .whitespaces), with: environment)
+    if !rawURL.isEmpty && !rawURL.contains("://") {
+      rawURL = "https://" + rawURL
+    }
     guard !rawURL.isEmpty, var components = URLComponents(string: rawURL) else {
       throw URLError(.badURL)
     }

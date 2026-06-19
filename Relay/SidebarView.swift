@@ -4,10 +4,16 @@ import SwiftData
 struct SidebarView: View {
   @Environment(\.modelContext) private var modelContext
   @Query(sort: \CollectionItem.createdAt) private var collections: [CollectionItem]
-  @Binding var selectedRequest: RequestItem?
+  var selectedRequest: RequestItem?
+  var onOpenRequest: (RequestItem) -> Void
+  var onCloseTab: (RequestItem) -> Void
   @State private var showingNewCollection = false
   @State private var newCollectionName = ""
-  @State private var expandedCollections: Set<PersistentIdentifier> = []
+  @AppStorage("expandedCollectionNames") private var expandedNamesStore: String = ""
+
+  private var expandedNames: Set<String> {
+    Set(expandedNamesStore.isEmpty ? [] : expandedNamesStore.components(separatedBy: "\n"))
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -21,9 +27,11 @@ struct SidebarView: View {
             ForEach(collections) { collection in
               CollectionRow(
                 collection: collection,
-                isExpanded: expandedCollections.contains(collection.id),
-                selectedRequest: $selectedRequest,
+                isExpanded: isExpanded(collection),
+                selectedRequest: selectedRequest,
                 onToggle: { toggleCollection(collection) },
+                onOpenRequest: onOpenRequest,
+                onCloseTab: onCloseTab,
                 onAddRequest: { addRequest(to: collection) },
                 onDelete: { deleteCollection(collection) }
               )
@@ -80,12 +88,18 @@ struct SidebarView: View {
     .padding(.top, 40)
   }
 
+  private func isExpanded(_ collection: CollectionItem) -> Bool {
+    expandedNames.contains(collection.name)
+  }
+
+  private func setExpanded(_ collection: CollectionItem, expanded: Bool) {
+    var names = expandedNames
+    if expanded { names.insert(collection.name) } else { names.remove(collection.name) }
+    expandedNamesStore = names.sorted().joined(separator: "\n")
+  }
+
   private func toggleCollection(_ collection: CollectionItem) {
-    if expandedCollections.contains(collection.id) {
-      expandedCollections.remove(collection.id)
-    } else {
-      expandedCollections.insert(collection.id)
-    }
+    setExpanded(collection, expanded: !isExpanded(collection))
   }
 
   private func createCollection() {
@@ -93,7 +107,7 @@ struct SidebarView: View {
     let collection = CollectionItem(name: name.isEmpty ? "New Collection" : name)
     modelContext.insert(collection)
     newCollectionName = ""
-    expandedCollections.insert(collection.id)
+    setExpanded(collection, expanded: true)
   }
 
   private func addRequest(to collection: CollectionItem) {
@@ -101,14 +115,12 @@ struct SidebarView: View {
     request.collection = collection
     modelContext.insert(request)
     collection.requests.append(request)
-    expandedCollections.insert(collection.id)
-    selectedRequest = request
+    setExpanded(collection, expanded: true)
+    onOpenRequest(request)
   }
 
   private func deleteCollection(_ collection: CollectionItem) {
-    if let req = selectedRequest, req.collection?.id == collection.id {
-      selectedRequest = nil
-    }
+    for req in collection.requests { onCloseTab(req) }
     modelContext.delete(collection)
   }
 }
@@ -116,8 +128,10 @@ struct SidebarView: View {
 struct CollectionRow: View {
   @Bindable var collection: CollectionItem
   let isExpanded: Bool
-  @Binding var selectedRequest: RequestItem?
+  var selectedRequest: RequestItem?
   let onToggle: () -> Void
+  let onOpenRequest: (RequestItem) -> Void
+  let onCloseTab: (RequestItem) -> Void
   let onAddRequest: () -> Void
   let onDelete: () -> Void
   @Environment(\.modelContext) private var modelContext
@@ -161,7 +175,7 @@ struct CollectionRow: View {
           RequestRow(
             request: request,
             isSelected: selectedRequest?.id == request.id,
-            onSelect: { selectedRequest = request },
+            onSelect: { onOpenRequest(request) },
             onDelete: { deleteRequest(request) }
           )
         }
@@ -170,7 +184,7 @@ struct CollectionRow: View {
   }
 
   private func deleteRequest(_ request: RequestItem) {
-    if selectedRequest?.id == request.id { selectedRequest = nil }
+    onCloseTab(request)
     modelContext.delete(request)
   }
 }
@@ -180,25 +194,60 @@ struct RequestRow: View {
   let isSelected: Bool
   let onSelect: () -> Void
   let onDelete: () -> Void
+  @State private var isRenaming = false
+  @State private var editingName = ""
+  @FocusState private var isRenameFocused: Bool
 
   var body: some View {
-    Button(action: onSelect) {
-      HStack(spacing: 8) {
-        MethodBadge(method: request.method, small: true)
+    HStack(spacing: 8) {
+      MethodBadge(method: request.method, small: true)
+      if isRenaming {
+        TextField("", text: $editingName)
+          .textFieldStyle(.plain)
+          .font(.system(size: 12))
+          .foregroundStyle(.white)
+          .focused($isRenameFocused)
+          .onAppear { isRenameFocused = true }
+          .onSubmit { commitRename() }
+          .onExitCommand { cancelRename() }
+          .onChange(of: isRenameFocused) { _, focused in
+            if !focused { commitRename() }
+          }
+      } else {
         Text(request.name)
           .font(.system(size: 12))
           .foregroundStyle(isSelected ? .white : Color(red: 0.85, green: 0.85, blue: 0.85))
           .lineLimit(1)
-        Spacer()
       }
-      .padding(.leading, 28)
-      .padding(.trailing, 12)
-      .padding(.vertical, 6)
-      .background(isSelected ? Color.relayAccent.opacity(0.2) : Color.clear)
+      Spacer()
     }
-    .buttonStyle(.plain)
+    .padding(.leading, 28)
+    .padding(.trailing, 12)
+    .padding(.vertical, 6)
+    .background(isSelected ? Color.relayAccent.opacity(0.2) : Color.clear)
+    .contentShape(Rectangle())
+    .onTapGesture(count: 2) { startRename() }
+    .onTapGesture(count: 1) { onSelect() }
     .contextMenu {
+      Button("Rename") { startRename() }
+      Divider()
       Button("Delete Request", role: .destructive, action: onDelete)
     }
+  }
+
+  private func startRename() {
+    editingName = request.name
+    isRenaming = true
+  }
+
+  private func commitRename() {
+    guard isRenaming else { return }
+    let trimmed = editingName.trimmingCharacters(in: .whitespaces)
+    if !trimmed.isEmpty { request.name = trimmed }
+    isRenaming = false
+  }
+
+  private func cancelRename() {
+    isRenaming = false
   }
 }

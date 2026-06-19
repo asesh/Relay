@@ -6,23 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Relay is a native iOS/macOS HTTP client app (Postman-style) built with SwiftUI and SwiftData. It lets users create request collections, configure HTTP requests, send them, and view formatted responses.
 
-- Deployment target: iOS 26.2
-- Platforms: iOS, iOS Simulator, macOS, xrOS
+- Deployment target: macOS (primary target; iOS/xrOS are secondary and currently ignored)
+- Platforms: macOS (active), iOS, xrOS
 - No Swift Package Manager dependencies; pure Xcode project
+
+> **Build target:** macOS only. Do not attempt iOS Simulator builds — the iOS 26.2 SDK is not installed. Always use the macOS destination for `xcodebuild` commands.
 
 ## Build & Test Commands
 
 Build and run via Xcode (no CLI build script). Use `xcodebuild` for CI or scripted builds:
 
 ```bash
-# Build
-xcodebuild -project "Relay.xcodeproj" -scheme Relay -destination 'platform=iOS Simulator,name=iPhone 16' build
+# Build (macOS)
+xcodebuild -project "Relay.xcodeproj" -scheme Relay -destination 'platform=macOS' build
 
-# Run unit tests
-xcodebuild test -project "Relay.xcodeproj" -scheme RelayTests -destination 'platform=iOS Simulator,name=iPhone 16'
+# Run unit tests (macOS)
+xcodebuild test -project "Relay.xcodeproj" -scheme RelayTests -destination 'platform=macOS'
 
-# Run UI tests
-xcodebuild test -project "Relay.xcodeproj" -scheme RelayUITests -destination 'platform=iOS Simulator,name=iPhone 16'
+# Run UI tests (macOS)
+xcodebuild test -project "Relay.xcodeproj" -scheme RelayUITests -destination 'platform=macOS'
 ```
 
 The test targets use Apple's `Testing` framework (unit tests) and `XCTest` (UI tests). Both are currently stubs.
