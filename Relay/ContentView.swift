@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+  @Environment(\.modelContext) private var modelContext
   @State private var openTabs: [RequestItem] = []
   @State private var selectedTab: RequestItem?
   @State private var showingEnvironments = false
@@ -53,6 +54,8 @@ struct ContentView: View {
     .sheet(isPresented: $showingEnvironments) {
       EnvironmentsView()
     }
+    .task { restoreSession() }
+    .onChange(of: selectedTab?.id) { saveSession() }
   }
 
   // MARK: - Tab Bar
@@ -85,18 +88,45 @@ struct ContentView: View {
       openTabs.append(request)
     }
     selectedTab = request
+    saveSession()
   }
 
   private func closeTab(_ request: RequestItem) {
     guard let idx = openTabs.firstIndex(where: { $0.id == request.id }) else { return }
     openTabs.remove(at: idx)
     if selectedTab?.id == request.id {
-      if openTabs.isEmpty {
-        selectedTab = nil
-      } else {
-        selectedTab = openTabs[max(0, idx - 1)]
-      }
+      selectedTab = openTabs.isEmpty ? nil : openTabs[max(0, idx - 1)]
     }
+    saveSession()
+  }
+
+  // MARK: - Session Persistence
+
+  private func saveSession() {
+    let ids = openTabs.map { $0.persistentModelID }
+    if let data = try? JSONEncoder().encode(ids) {
+      UserDefaults.standard.set(data, forKey: "sessionTabIDs")
+    }
+    if let tab = selectedTab, let data = try? JSONEncoder().encode(tab.persistentModelID) {
+      UserDefaults.standard.set(data, forKey: "sessionSelectedTabID")
+    } else {
+      UserDefaults.standard.removeObject(forKey: "sessionSelectedTabID")
+    }
+  }
+
+  private func restoreSession() {
+    guard
+      let data = UserDefaults.standard.data(forKey: "sessionTabIDs"),
+      let ids = try? JSONDecoder().decode([PersistentIdentifier].self, from: data),
+      let allItems = try? modelContext.fetch(FetchDescriptor<RequestItem>())
+    else { return }
+
+    let byID = Dictionary(uniqueKeysWithValues: allItems.map { ($0.persistentModelID, $0) })
+    openTabs = ids.compactMap { byID[$0] }
+
+    let selectedID = UserDefaults.standard.data(forKey: "sessionSelectedTabID")
+      .flatMap { try? JSONDecoder().decode(PersistentIdentifier.self, from: $0) }
+    selectedTab = openTabs.first { $0.persistentModelID == selectedID } ?? openTabs.first
   }
 
   // MARK: - Environment Picker
