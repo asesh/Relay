@@ -85,12 +85,14 @@ final class HeaderItem {
   var key: String
   var value: String
   var isEnabled: Bool
+  var createdAt: Date
   var request: RequestItem?
 
   init(key: String = "", value: String = "", isEnabled: Bool = true) {
     self.key = key
     self.value = value
     self.isEnabled = isEnabled
+    self.createdAt = Date()
   }
 }
 
@@ -99,12 +101,14 @@ final class QueryParamItem {
   var key: String
   var value: String
   var isEnabled: Bool
+  var createdAt: Date
   var request: RequestItem?
 
   init(key: String = "", value: String = "", isEnabled: Bool = true) {
     self.key = key
     self.value = value
     self.isEnabled = isEnabled
+    self.createdAt = Date()
   }
 }
 

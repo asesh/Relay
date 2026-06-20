@@ -352,8 +352,7 @@ struct ParamsEditorView: View {
       Divider().background(Color.relayBorder)
       ScrollView {
         VStack(spacing: 0) {
-          let sorted = request.queryParams.sorted { $0.key < $1.key }
-          ForEach(sorted) { param in
+          ForEach(request.queryParams.sorted { $0.createdAt < $1.createdAt }) { param in
             KeyValueRowView(
               key: Binding(get: { param.key }, set: { param.key = $0 }),
               value: Binding(get: { param.value }, set: { param.value = $0 }),
@@ -364,6 +363,7 @@ struct ParamsEditorView: View {
           }
         }
       }
+      .scrollIndicators(.visible)
       .background(Color.relayBg)
       addButton("Add Param") { addParam() }
     }
@@ -409,8 +409,7 @@ struct HeadersEditorView: View {
       Divider().background(Color.relayBorder)
       ScrollView {
         VStack(spacing: 0) {
-          let sorted = request.headers.sorted { ($0.key + $0.value) < ($1.key + $1.value) }
-          ForEach(sorted) { header in
+          ForEach(request.headers.sorted { $0.createdAt < $1.createdAt }) { header in
             KeyValueRowView(
               key: Binding(get: { header.key }, set: { header.key = $0 }),
               value: Binding(get: { header.value }, set: { header.value = $0 }),
@@ -421,6 +420,7 @@ struct HeadersEditorView: View {
           }
         }
       }
+      .scrollIndicators(.visible)
       .background(Color.relayBg)
       addButton("Add Header") { addHeader() }
     }

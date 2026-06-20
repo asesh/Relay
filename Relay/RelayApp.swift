@@ -4,7 +4,7 @@ import SwiftData
 @main
 struct RelayApp: App {
   var sharedModelContainer: ModelContainer = {
-    let schema = Schema(RelaySchemaV2.models)
+    let schema = Schema(RelaySchemaV3.models)
     let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
     do {
       return try ModelContainer(

@@ -2,14 +2,15 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-  @Environment(\.modelContext) private var modelContext
   @State private var openTabs: [RequestItem] = []
   @State private var selectedTab: RequestItem?
   @State private var tabStates: [PersistentIdentifier: TabState] = [:]
   @State private var showingEnvironments = false
   @State private var showCurlSidebar = false
+  @State private var sessionRestored = false
   @AppStorage("activeEnvironmentName") private var activeEnvironmentName: String = ""
   @Query(sort: \RelayEnvironment.createdAt) private var environments: [RelayEnvironment]
+  @Query private var allRequestItems: [RequestItem]
 
   var activeEnvironment: RelayEnvironment? {
     guard !activeEnvironmentName.isEmpty else { return nil }
@@ -79,7 +80,11 @@ struct ContentView: View {
     .sheet(isPresented: $showingEnvironments) {
       EnvironmentsView()
     }
-    .task { restoreSession() }
+    .onChange(of: allRequestItems, initial: true) { _, items in
+      guard !sessionRestored, !items.isEmpty else { return }
+      sessionRestored = true
+      restoreSession(from: items)
+    }
     .onChange(of: selectedTab?.id) { saveSession() }
   }
 
@@ -141,15 +146,13 @@ struct ContentView: View {
     }
   }
 
-  private func restoreSession() {
+  private func restoreSession(from allItems: [RequestItem]) {
     guard
       let data = UserDefaults.standard.data(forKey: "sessionTabIDs"),
-      let ids = try? JSONDecoder().decode([PersistentIdentifier].self, from: data),
-      let allItems = try? modelContext.fetch(FetchDescriptor<RequestItem>())
+      let ids = try? JSONDecoder().decode([PersistentIdentifier].self, from: data)
     else { return }
 
-    let byID = Dictionary(uniqueKeysWithValues: allItems.map { ($0.persistentModelID, $0) })
-    openTabs = ids.compactMap { byID[$0] }
+    openTabs = ids.compactMap { id in allItems.first { $0.persistentModelID == id } }
     for tab in openTabs { tabStates[tab.id] = TabState() }
 
     let selectedID = UserDefaults.standard.data(forKey: "sessionSelectedTabID")
