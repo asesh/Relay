@@ -27,7 +27,6 @@ struct RequestEditorView: View {
   var activeEnvironment: RelayEnvironment?
   @Binding var tabState: TabState
   @Environment(\.modelContext) private var modelContext
-
   var body: some View {
     VStack(spacing: 0) {
       urlBar
@@ -56,6 +55,7 @@ struct RequestEditorView: View {
         .background(Color.relayInputBg)
         .clipShape(RoundedRectangle(cornerRadius: 6))
       sendButton
+      cancelButton
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
@@ -89,26 +89,35 @@ struct RequestEditorView: View {
 
   private var sendButton: some View {
     Button {
+      guard !tabState.isLoading else { return }
       Task { await sendRequest() }
     } label: {
-      HStack(spacing: 6) {
-        if tabState.isLoading {
-          ProgressView()
-            .scaleEffect(0.7)
-            .tint(.white)
-        } else {
-          Text("Send")
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-        }
-      }
-      .padding(.horizontal, 18)
-      .padding(.vertical, 8)
-      .background(tabState.isLoading ? Color.relayAccent.opacity(0.6) : Color.relayAccent)
-      .clipShape(RoundedRectangle(cornerRadius: 6))
+      Text("Send")
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 8)
+        .background(Color.relayAccent)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
     .buttonStyle(.plain)
     .disabled(tabState.isLoading || request.url.trimmingCharacters(in: .whitespaces).isEmpty)
+  }
+
+  private var cancelButton: some View {
+    Button {
+      NetworkService.shared.cancel()
+    } label: {
+      Text("Cancel")
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 8)
+        .background(Color.red.opacity(0.85))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+    .buttonStyle(.plain)
+    .disabled(!tabState.isLoading)
   }
 
   // MARK: - Request Tabs
@@ -333,6 +342,10 @@ struct RequestEditorView: View {
     tabState.response = nil
     do {
       tabState.response = try await NetworkService.shared.send(request, environment: activeEnvironment)
+    } catch is CancellationError {
+      // cancelled — leave response cleared, no error shown
+    } catch let urlError as URLError where urlError.code == .cancelled {
+      // URLSession aborted the request — same treatment
     } catch {
       tabState.errorMessage = error.localizedDescription
     }

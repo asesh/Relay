@@ -43,11 +43,25 @@ struct HTTPResponse {
 class NetworkService {
   static let shared = NetworkService()
   private let session: URLSession
+  private let lock = NSLock()
+  private var currentDataTask: URLSessionDataTask?
 
   private init() {
     let config = URLSessionConfiguration.default
     config.timeoutIntervalForRequest = 30
     session = URLSession(configuration: config)
+  }
+
+  // Safe to call from any thread including the main thread.
+  func cancel() {
+    // Hop to a plain GCD thread so URLSessionDataTask.cancel() never touches the
+    // main actor or the Swift concurrency cooperative thread pool — both of which
+    // can deadlock via CFNetwork's internal main-run-loop dispatch on macOS.
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      guard let self else { return }
+      let task = self.lock.withLock { self.currentDataTask }
+      task?.cancel()
+    }
   }
 
   func send(_ request: RequestItem, environment: RelayEnvironment?) async throws -> HTTPResponse {
@@ -127,7 +141,20 @@ class NetworkService {
     }
 
     let start = Date()
-    let (data, response) = try await session.data(for: urlRequest)
+    let (data, response): (Data, URLResponse) = try await withCheckedThrowingContinuation { continuation in
+      let task = session.dataTask(with: urlRequest) { [weak self] data, response, error in
+        self?.lock.withLock { self?.currentDataTask = nil }
+        if let error {
+          continuation.resume(throwing: error)
+        } else if let data, let response {
+          continuation.resume(returning: (data, response))
+        } else {
+          continuation.resume(throwing: URLError(.unknown))
+        }
+      }
+      lock.withLock { currentDataTask = task }
+      task.resume()
+    }
     let duration = Date().timeIntervalSince(start)
 
     guard let httpResponse = response as? HTTPURLResponse else {
